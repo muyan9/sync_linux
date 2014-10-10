@@ -14,9 +14,12 @@ if __name__ == '__main__':
     ftp = ftplib.FTP()
     ftp.connect("mirrors.sohu.com", 21)
     ftp.login("anonymous", "")
-#     ftp.dir(s_dir)
+#     ftp.dir()
 #     ftp.dir("fedora", tt)
 #     print type(s_dir)
 #     tt = s_dir.split
 #     print tt
-    print ftp.pwd()
+#     print ftp.pwd()
+#     f= open("ddd", 'wb').write
+#     ftp.retrbinary("RETR FOOTER.html", f)
+    ftp.sendcmd("ls / .")
