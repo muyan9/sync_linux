@@ -105,7 +105,7 @@ if __name__ == '__main__':
     file_content = f.read()
 #     print file_content
     f.close()
-     
+    
     #.*\n(.*\n)+"
     p_segment = """Package: .*?\n\n"""
     p_filename = "Filename:\s*(.*?)\n"
