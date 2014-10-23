@@ -2,8 +2,6 @@
 
 import hashlib, os
 import binascii
-import hashlib
-
 
 def md5(str):
     return hashlib.md5(str).hexdigest().upper()
@@ -44,6 +42,22 @@ def sha1_file(filename):
     hash_value = hash_new.hexdigest() #生成40位(sha1)或32位(md5)的十六进制字符串
     return hash_value
 
+def sha256(str):
+    hash_new = hashlib.sha256() #或hashlib.md5()
+    hash_new.update(str)
+    hash_value = hash_new.hexdigest() #生成40位(sha1)或32位(md5)的十六进制字符串
+    return hash_value
+
+def sha256_file(filename):
+    hash_new = hashlib.sha256() #或hashlib.md5()
+    with open(filename,'rb') as fp: #打开文件，一定要以二进制打开
+        while True:
+            data = fp.read(4096*256) #读取文件块
+            if not data: #直到读完文件
+                break
+            hash_new.update(data)
+    hash_value = hash_new.hexdigest() #生成40位(sha1)或32位(md5)的十六进制字符串
+    return hash_value
 
 if __name__ == "__main__":
     path = u"D:\\迅雷下载\\apache-tomcat-7.0.52.zip"
