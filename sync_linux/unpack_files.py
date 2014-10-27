@@ -1,15 +1,24 @@
 #coding: utf8
-import os
-# Animal = Enum('Animal', 'ant bee cat dog')
-a = ['iso', 'gz', 'bz2', 'bzip2', 'tar', 'gzip', 'cpio', 'zip', 'cab', 'arj', '7z', 'rpm', 'deb', 'xz', 'lzma', 'lzip', 'lzop']
-# class enum_filetype():
-#     iso = "iso"
-#     zip = "zip"
-#     targz = "tar.gz"
-#     tarbz2 = "tar.bz2"
-#     other = "other"
-#     a = {'iso':['iso'], 'zip':['zip'], }
-# 
+import os, shutil
+import inspect
+dict_type_package = {'iso':'7z', 
+                     'gz':'7z', 
+                     'bz2':'7z',
+                     'bzip2':'7z', 
+                     'tar':'7z', 
+                     'gzip':'7z', 
+                     'cpio':'', 
+                     'zip':'7z', 
+                     'cab':'7z', 
+                     'arj':'7z', 
+                     '7z':'7z', 
+                     'rpm':'', 
+                     'deb':'', 
+                     'xz':'', 
+                     'lzma':'', 
+                     'lzip':'', 
+                     'lzop':''}
+
 # def _mktemp(type):
 #     if not type or type==enum_filetype.other:
 #         cmd = '/bin/mktemp -d --suffix _other'
@@ -61,27 +70,87 @@ a = ['iso', 'gz', 'bz2', 'bzip2', 'tar', 'gzip', 'cpio', 'zip', 'cab', 'arj', '7
 """
 #--recursion
 #-C, --directory=DIR
-
-def unpack(filename):
-    if not filename:
-        raise Exception("fdsf")
-    l_filename = os.path.splitext(filename)
-    if len(l_filename)==2:
-        extname = l_filename[1]
-    return extname
-    
-def clean_unpack(path_dir):
-    type = path_dir.split("_")[1]
-    if type in enum_filetype.__dict__:
-        if enum_filetype.__dict__[type] == enum_filetype.iso:
-            os.popen('umount %s' % path_dir)
-        os.removedirs(path_dir)
+class unpack():
+    def is_pack(self, filename):
+        if not os.path.exists(filename):
+            raise IOError("file '%s' not found!" % filename)
         
-if __name__ == "__main__":
-#TODO: 允许扩展解压种类
-    path = "/root/mount/222/NeoKylin-3.2.iso"
-    a = unpack_iso(path)
-    clean_unpack(a)
+        l_filename = os.path.splitext(filename)
+        if len(l_filename)==2:
+            #splitextf分解/root/a.tar.gz的结果是tuple: ('/root/a.tar', '.gz')
+            #所以要把扩展名的第一个字符’.’去掉
+            extname = l_filename[1][1:]
+            if extname in dict_type_package.keys():
+                return dict_type_package[extname]
+        
+        return None
     
-    path = 'd:/test/unpack/gz/mkinitcpio-0.2.1.tar.gz'
-    unpack_gz(path)
+    def _mktemp(self):
+        cmd = '/bin/mktemp -d -p /dev/shm/'
+        return os.popen(cmd).read().strip()
+     
+    def unpack_7z(self, filename):
+        if not os.path.exists(filename):
+            raise IOError("file '%s' not found!" % filename)
+        
+        dir_tmp = self._mktemp()
+        
+        cmd = '7za x -y -o%(dir_dst)s %(dir_src)s > /dev/null' % {'dir_src':filename, 'dir_dst':dir_tmp}
+        #TODO: uncomment this after debug
+        os.popen(cmd)
+        
+        return dir_tmp
+    
+    #, flag_recursive=True
+    def unpack(self, filename):
+        ispack = self.is_pack(filename)
+        if ispack:
+            #查找是否有对应类型的解压缩方法，若有，直接动态调用对应的方法
+            for i in inspect.getmembers(unpack):
+                if i[0] == 'unpack_%s' % ispack:
+                    dir_temp = i[1](self, filename)
+                    return dir_temp
+        
+        return None
+    
+def removefiles(file):
+    if os.path.isdir(file):
+#         os.removedirs(file)
+        shutil.rmtree(file)
+    else:
+        os.remove(file)
+
+def walk_dir(filename):
+    list_files = []
+    for root,dirs,files in os.walk(filename):
+        for file in files:
+            list_files.append(os.path.join(root, file))
+            
+    return list_files
+
+def do_work(filename, pkgname_parent="", flag_delete=False):
+    u = unpack()
+    for file in walk_dir(filename):
+        dir_temp = u.unpack(file)
+        if dir_temp:
+            do_work(dir_temp, file, flag_delete=True)
+#             print file, dir_temp
+        else:
+            print 'hash:', os.path.basename(pkgname_parent), file
+            #TODO: hash it
+            
+            removefiles(file)
+    else:
+        if flag_delete:
+            print 'removefiles:', filename
+            removefiles(filename)
+
+if __name__ == "__main__":
+# #TODO: 允许扩展解压种类
+#     clean_unpack(a)
+#     u = unpack()
+    #TODO: delete tmp files and do not remove any origin files
+    #TODO: first run, hash all files
+    path = "/root/test/unpack/gz"
+    do_work(path, flag_delete=True)
+    #TODO: not first run, read increment list
