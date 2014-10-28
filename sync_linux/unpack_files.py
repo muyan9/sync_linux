@@ -1,6 +1,6 @@
 #coding: utf8
-import os, shutil
-import inspect
+import os, shutil, inspect
+import hash
 dict_type_package = {'iso':'7z', 
                      'gz':'7z', 
                      'bz2':'7z',
@@ -96,7 +96,6 @@ class unpack():
         dir_tmp = self._mktemp()
         
         cmd = '7za x -y -o%(dir_dst)s %(dir_src)s > /dev/null' % {'dir_src':filename, 'dir_dst':dir_tmp}
-        #TODO: uncomment this after debug
         os.popen(cmd)
         
         return dir_tmp
@@ -128,29 +127,90 @@ def walk_dir(filename):
             
     return list_files
 
+# def do_work(filename, pkgname_parent="", flag_delete=False):
+#     u = unpack()
+#     l = []
+#     for file in walk_dir(filename):
+#         dir_temp = u.unpack(file)
+#         if dir_temp:
+#             d_md5 = hash.md5_file(file)
+#             d_sha1 = hash.sha1_file(file)
+#             d_sha256 = hash.sha256_file(file)
+# #             pkgname_parent = file.partition(filename)[2][1:]
+# #             if pkgname_parent == os.path.basename(file):
+# #                 pkgname_parent = ""
+#             print pkgname_parent
+#             l.append((file, pkgname_parent, d_md5, d_sha1, d_sha256))
+#             ll = do_work(dir_temp, file, flag_delete=True)
+#             l = l + ll
+# #             print file, dir_temp
+#         else:
+# #             print 'hash:', pkgname_parent, file
+#             #TODO: hash it
+# #             print 1
+#             d_md5 = hash.md5_file(file)
+#             d_sha1 = hash.sha1_file(file)
+#             d_sha256 = hash.sha256_file(file)
+#             t_filename = file.partition(filename)[2]
+#             print t_filename
+#             l.append((file, pkgname_parent, d_md5, d_sha1, d_sha256))
+#             removefiles(file)
+#     else:
+#         if flag_delete:
+# #             print 'removefiles:', filename
+#             removefiles(filename)
+#             
+#     return l
+
+o_unpack = unpack()
+
 def do_work(filename, pkgname_parent="", flag_delete=False):
-    u = unpack()
+    l = []
     for file in walk_dir(filename):
-        dir_temp = u.unpack(file)
-        if dir_temp:
-            do_work(dir_temp, file, flag_delete=True)
+        if o_unpack.is_pack(file):
+            dir_temp = o_unpack.unpack(file)
+            d_md5 = hash.md5_file(file)
+            d_sha1 = hash.sha1_file(file)
+            d_sha256 = hash.sha256_file(file)
+            t_filename = file.partition(filename)[2]
+#             if pkgname_parent == os.path.basename(file):
+#                 pkgname_parent = ""
+            print pkgname_parent
+            l.append((t_filename, pkgname_parent, d_md5, d_sha1, d_sha256))
+            ll = do_work(dir_temp, file, flag_delete=True)
+            l = l + ll
 #             print file, dir_temp
         else:
-            print 'hash:', os.path.basename(pkgname_parent), file
+#             print 'hash:', pkgname_parent, file
             #TODO: hash it
-            
+#             print 1
+            d_md5 = hash.md5_file(file)
+            d_sha1 = hash.sha1_file(file)
+            d_sha256 = hash.sha256_file(file)
+            t_filename = file.partition(filename)[2]
+            print t_filename
+            t_pkg_parent = pkgname_parent.partition(filename)[2]
+            l.append((t_filename, t_pkg_parent, d_md5, d_sha1, d_sha256))
             removefiles(file)
     else:
         if flag_delete:
-            print 'removefiles:', filename
+#             print 'removefiles:', filename
             removefiles(filename)
+            
+    return l
+
+
+#TODO: 完成后移到上面去
+
 
 if __name__ == "__main__":
 # #TODO: 允许扩展解压种类
 #     clean_unpack(a)
 #     u = unpack()
-    #TODO: delete tmp files and do not remove any origin files
+    #delete tmp files and do not remove any origin files
     #TODO: first run, hash all files
     path = "/root/test/unpack/gz"
-    do_work(path, flag_delete=True)
+    l = do_work(path, flag_delete=False)
+    for i in l :
+        print i
     #TODO: not first run, read increment list
