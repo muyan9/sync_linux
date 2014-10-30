@@ -1,0 +1,27 @@
+[
+	{
+	    ('/a.tar.gz', '', 'md5', 'sha1', 'sha256', 'filesize'): 
+	    [
+	        {
+	            ('/a.tar', '/a.tar.gz', 'md5', 'sha1', 'sha256', 'filesize'): 
+	            [
+	                {
+	                    ('/a/b.tar.gz', '/a.tar', 'md5', 'sha1', 'sha256', 'filesize'): 
+	                    [
+	                        {
+	                            ('/b.tar', '/a/b.tar.gz', 'md5', 'sha1', 'sha256', 'filesize'): 
+	                            [
+	                                ('/b/f4', '/b.tar', 'md5', 'sha1', 'sha256', 'filesize'), 
+	                                ('/b/f3', '/b.tar', 'md5', 'sha1', 'sha256', 'filesize')
+	                            ]
+	                        }
+	                    ]
+	                }, 
+	                ('/a/f2', '/a.tar', 'md5', 'sha1', 'sha256', 'filesize'), 
+	                ('/a/f1', '/a.tar', 'md5', 'sha1', 'sha256', 'filesize')
+	            ]
+	        }
+	    ]
+	},
+	('/t1', '', 'md5', 'sha1', 'sha256', 'filesize')
+]

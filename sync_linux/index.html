@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>test</title>
+	<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+	<link rel="stylesheet" href="css/demo.css" type="text/css">
+	<link rel="stylesheet" href="css/zTreeStyle/zTreeStyle.css" type="text/css">
+	<script type="text/javascript" src="js/jquery-1.11.1.min.js"></script>
+	<script type="text/javascript" src="js/jquery.ztree.core-3.5.js"></script>
+	
+	<SCRIPT type="text/javascript">
+		var setting = {
+			data: {
+				simpleData: {
+					enable: true
+				}
+			}
+		};
+
+		var zNodes =[
+			{ id:1, pId:0, name:"parent1 - ext", open:true},
+			{ id:11, pId:1, name:"parent11 - coll"},
+			{ id:111, pId:11, name:"leaf111"},
+			{ id:112, pId:11, name:"leaf112"},
+			{ id:113, pId:11, name:"leaf113"},
+			{ id:114, pId:11, name:"leaf114"},
+			{ id:12, pId:1, name:"parent12 - coll"},
+			{ id:121, pId:12, name:"leaf121"},
+			{ id:122, pId:12, name:"leaf122"},
+			{ id:123, pId:12, name:"leaf123"},
+			{ id:124, pId:12, name:"leaf124"},
+			{ id:13, pId:1, name:"parent13 - no leaf", isParent:true},
+			{ id:2, pId:0, name:"parent2 - coll"},
+			{ id:21, pId:2, name:"parent21 - ext", open:true},
+			{ id:211, pId:21, name:"leaf211", isParent:true},
+			{ id:212, pId:21, name:"leaf212"},
+			{ id:213, pId:21, name:"leaf213"},
+			{ id:214, pId:21, name:"leaf214"},
+			{ id:22, pId:2, name:"parent22 - coll"},
+			{ id:221, pId:22, name:"leaf221"},
+			{ id:222, pId:22, name:"leaf222"},
+			{ id:223, pId:22, name:"leaf223"},
+			{ id:224, pId:22, name:"leaf224"},
+			{ id:23, pId:2, name:"parent23 - coll"},
+			{ id:231, pId:23, name:"leaf231"},
+			{ id:232, pId:23, name:"leaf232"},
+			{ id:233, pId:23, name:"leaf233"},
+			{ id:234, pId:23, name:"leaf234"},
+			{ id:3, pId:0, name:"parent3 - no leaf", isParent:true}
+		];
+
+		$(document).ready(function(){
+			$.get('/data',  function(data){
+				var list_data = [];
+				for(var i in data){
+					t['id'] = i['id'];
+					t['pId'] = i['pid'];
+					t['name'] = i['filename'];
+					list_data.append(t);
+				}
+			}, 'json');
+			$.fn.zTree.init($("#treeDemo"), setting, zNodes);
+		});
+	</SCRIPT>
+</head>
+<body>
+
+<div class="content_wrap">
+	<div class="zTreeDemoBackground left">
+		<ul id="treeDemo" class="ztree"></ul>
+	</div>
+	
+</div>
+</body>

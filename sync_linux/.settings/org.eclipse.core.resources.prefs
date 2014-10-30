@@ -5,4 +5,5 @@ encoding/down_http.py=utf8
 encoding/hash.py=utf8
 encoding/main.py=utf8
 encoding/test_gz.py=utf8
+encoding/test_json.py=utf8
 encoding/unpack_files.py=utf8

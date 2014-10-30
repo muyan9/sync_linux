@@ -1,7 +1,7 @@
 #coding: utf8
 import os, shutil, inspect
 import hash
-dict_type_package = {'iso':'7z', 
+dict_type_package = {'iso':'iso', 
                      'gz':'7z', 
                      'bz2':'7z',
                      'bzip2':'7z', 
@@ -12,7 +12,8 @@ dict_type_package = {'iso':'7z',
                      'cab':'7z', 
                      'arj':'7z', 
                      '7z':'7z', 
-                     'rpm':'', 
+                     'rpm':'rpm', 
+                     'drpm':'',
                      'deb':'', 
                      'xz':'', 
                      'lzma':'', 
@@ -44,10 +45,43 @@ class unpack():
         
         dir_tmp = mktemp()
         
+#         extname = os.path.splitext(filename)[1]
+#         if extname == '.iso':
+#             cmd = 'mount -oloop,ro %(dir_src)s %(dir_dst)s' % {'dir_src':filename, 'dir_dst':dir_tmp}
+#         else:
+#             cmd = '7za x -y -o%(dir_dst)s %(dir_src)s > /dev/null' % {'dir_src':filename, 'dir_dst':dir_tmp}
         cmd = '7za x -y -o%(dir_dst)s %(dir_src)s > /dev/null' % {'dir_src':filename, 'dir_dst':dir_tmp}
         os.popen(cmd)
         
         return dir_tmp
+
+    def unpack_rpm(self, filename):
+        if not os.path.exists(filename):
+            raise IOError("file '%s' not found!" % filename)
+        
+        dir_tmp = mktemp()
+        
+        cmd = 'cd %(dir_dst)s && rpm2cpio %(dir_src)s | cpio -di > /dev/null' % {'dir_src':filename, 'dir_dst':dir_tmp}
+        os.popen(cmd)
+        
+        return dir_tmp
+
+    def unpack_iso(self, filename):
+        if not os.path.exists(filename):
+            raise IOError("file '%s' not found!" % filename)
+        
+        dir_tmp = mktemp()
+        #TODO: 考虑用更好的方式，不需拷贝，又能兼顾到即算即删，与下面的删除方法兼容
+        cmd = 'mount -oloop,ro %(dir_src)s %(dir_dst)s' % {'dir_src':filename, 'dir_dst':dir_tmp}
+        os.popen(cmd)
+        dir_tmp1 = mktemp()
+        cmd = 'cp -r %s/* %s/' % (dir_tmp, dir_tmp1)
+        os.popen(cmd)
+        cmd = 'umount %s' % dir_tmp
+        os.popen(cmd)
+        removefiles(dir_tmp)
+        
+        return dir_tmp1
     
     #, flag_recursive=True
     def unpack(self, filename):
@@ -76,7 +110,7 @@ def is_pack(filename):
     return None
 
 def mktemp():
-    cmd = '/bin/mktemp -d -p /dev/shm/'
+    cmd = '/bin/mktemp -d -p /root/test/unpack/tmp'
     return os.popen(cmd).read().strip()
     
 def removefiles(file):
@@ -97,74 +131,108 @@ def walk_dir(filename):
 
 o_unpack = unpack()
 
-def do_work(filename, pkgname_parent="", flag_delete=False):
+def do_work(filename, list_data, pkgname_parent="", flag_delete=False):
     '''
 {
-    ('/a.tar.gz', '', 'md5', 'sha1', 'sha256'): 
+    ('/a.tar.gz', '', 'md5', 'sha1', 'sha256', 'filesize'): 
     [
         {
-            ('/a.tar', '/a.tar.gz', 'md5', 'sha1', 'sha256'): 
+            ('/a.tar', '/a.tar.gz', 'md5', 'sha1', 'sha256', 'filesize'): 
             [
                 {
-                    ('/a/b.tar.gz', '/a.tar', 'md5', 'sha1', 'sha256'): 
+                    ('/a/b.tar.gz', '/a.tar', 'md5', 'sha1', 'sha256', 'filesize'): 
                     [
                         {
-                            ('/b.tar', '/a/b.tar.gz', 'md5', 'sha1', 'sha256'): 
+                            ('/b.tar', '/a/b.tar.gz', 'md5', 'sha1', 'sha256', 'filesize'): 
                             [
-                                ('/b/f4', '/b.tar', 'md5', 'sha1', 'sha256'), 
-                                ('/b/f3', '/b.tar', 'md5', 'sha1', 'sha256')
+                                ('/b/f4', '/b.tar', 'md5', 'sha1', 'sha256', 'filesize'), 
+                                ('/b/f3', '/b.tar', 'md5', 'sha1', 'sha256', 'filesize')
                             ]
                         }
                     ]
                 }, 
-                ('/a/f2', '/a.tar', 'md5', 'sha1', 'sha256'), 
-                ('/a/f1', '/a.tar', 'md5', 'sha1', 'sha256')
+                ('/a/f2', '/a.tar', 'md5', 'sha1', 'sha256', 'filesize'), 
+                ('/a/f1', '/a.tar', 'md5', 'sha1', 'sha256', 'filesize')
             ]
         }
     ]
 }
-('/t1', '', 'md5', 'sha1', 'sha256')
+('/t1', '', 'md5', 'sha1', 'sha256', 'filesize')
 
 '''
     l = []
-    d = {}
+    
     for file in walk_dir(filename):
+        #FIXME: 判断解压临时存储位置是否能放得下，用一次读取n次计算的方式解决
+        if os.path.islink(file):
+            os.unlink(file)
+            continue
         d_md5 = hash.md5_file(file)
         d_sha1 = hash.sha1_file(file)
         d_sha256 = hash.sha256_file(file)
         filesize = os.stat(file).st_size
+        
+        cmd= 'file %s | cut -c %s-' % (file, len(file)+3)
+        filetype  =os.popen(cmd).read().strip() 
+
         t_filename = file.partition(filename)[2]
         
         if is_pack(file):
             dir_temp = o_unpack.unpack(file)
-            pkg_info = (t_filename, pkgname_parent, d_md5, d_sha1, d_sha256, filesize)
-            ll = do_work(dir_temp, t_filename, flag_delete=True)
+            pkg_info = (t_filename, pkgname_parent, d_md5, d_sha1, d_sha256, filesize, filetype)
+            ll = do_work(dir_temp,list_data, t_filename, flag_delete=True)
+            d = {}
             d[pkg_info] = ll
             l.append(d)
         else:
-            l.append((t_filename, pkgname_parent, d_md5, d_sha1, d_sha256))
+            l.append((t_filename, pkgname_parent, d_md5, d_sha1, d_sha256, filesize, filetype))
             if flag_delete:
                 removefiles(file)
     else:
         if flag_delete:
             removefiles(filename)
-            
+#     list_data.append(l)
     return l
 
-
-#TODO: 完成后移到上面去
-
+def insert_data(node, node_parent_id):
+    #('/a/f2', '/a.tar', 'md5', 'sha1', 'sha256', 'filesize'), 
+    node_type = type(node)
+    if node_type==type(()):
+        sql = "insert into t_hashdata\
+        (pid, filename, md5, sha1, sha256, filesize, filetype) \
+        values(%(pid)s, '%(filename)s', '%(md5)s', \
+        '%(sha1)s', '%(sha256)s', %(filesize)s, '%(filetype)s')" \
+        % {'pid':node_parent_id, 'filename':node[0], 'md5':node[2], 'sha1':node[3], 
+           'sha256':node[4], 'filesize':node[5], 'filetype':node[6]}
+        print  sql
+        cursor.execute(sql)
+        return conn.insert_id()
+    elif node_type==type({}):
+        key = node.keys()[0]
+        value = node[key]
+        id = insert_data(key, node_parent_id)
+        insert_data(value, id)
+    elif node_type==type([]):
+        for i in node:
+            insert_data(i, node_parent_id)
+    else:
+        pass
+    
+import MySQLdb
+conn = MySQLdb.Connect(host = "10.255.193.222", port=3306, user="sync", passwd="linux", db="sync_linux")
+cursor = conn.cursor()
 
 if __name__ == "__main__":
-# #TODO: 允许扩展解压种类
-#     clean_unpack(a)
-#     u = unpack()
+    #TODO: 允许扩展解压种类
     #delete tmp files and do not remove any origin files
     #TODO: first run, hash all files
-    path = "/root/test/unpack/gz"
-    l = do_work(path, pkgname_parent='centos', flag_delete=False)
-    for i in l :
-        print i
+    path = "/root/test/unpack/rpm"
+    l = do_work(path, [], pkgname_parent='centos', flag_delete=False)
+#     print l
+    insert_data(l, 2)
+    
+#     for i in l :
+#         print i
     #TODO: not first run, read increment list
     
     #TODO: 有些文件是更新的，如何处理

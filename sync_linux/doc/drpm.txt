@@ -1,0 +1,17 @@
+http://cholla.mmto.org/computers/linux/rpm/drpm.html
+
+Working with DRPMS
+
+There is a plugin for yum called yum-presto. The idea is that many updates only have a tiny amount of changed update, the rest is redundant with what has already been installed. The heart of the buisness is a speed optimized version of the berkeley binary diff algorithm.
+
+A delta RPM is made as follows:
+
+makedeltarpm oldrpm.rpm newrpm.rpm deltarpm.drpm
+Note that RPM itself doesn't know anything about these. This is handled entirely by YUM and the new rpm must be reconstituted by YUM before being presented to rpm. The reconstitution is done via:
+applydeltarpm delta.drpm new.rpm
+applydeltarpm -r old.rpm delta.drpm new.rpm
+This can be done from a full repository via:
+createdeltarpms ./repo ./repo/DRPMS
+To create a presto repo (in particular the prestodelta.xml file) and then link the prestodelta.xml file to the repomod.xml file do:
+createprestorepo ./repo
+modifyrepo ./repodata/prestodelta.xml ./repodata/
