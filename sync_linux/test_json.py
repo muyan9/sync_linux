@@ -6,7 +6,7 @@ conn = MySQLdb.Connect(host = "10.255.193.222", port=3306, user="sync", passwd="
 cursor = conn.cursor(MySQLdb.cursors.DictCursor)
 
 import string,cgi,time
-from os import curdir, sep
+import os
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 #import pri
 
@@ -14,55 +14,51 @@ class MyHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
-            if self.path=='/':
-                path = curdir + sep + 'index.html'
-                print path
-                f = open(path)
-                self.send_response(200)
-                self.send_header('Content-type',    'text/html')
-                self.end_headers()
-                self.wfile.write(f.read())
-                f.close()
-                return
-
-            if self.path.endswith(".js") or self.path.endswith(".css"):
-                path = curdir + sep + self.path
-                print path
-                f = open(path)
-                self.send_response(200)
-                self.send_header('Content-type',    'text/html')
-                self.end_headers()
-                self.wfile.write(f.read())
-                f.close()
-                return
-
-            if self.path.endswith(".html"):
-                path = curdir + sep + self.path
-                print path
-                f = open(path)
-                self.send_response(200)
-                self.send_header('Content-type',    'text/html')
-                self.end_headers()
-                self.wfile.write(f.read())
-                f.close()
-                return
-                
             if self.path=='data':
-                sql = """select t1.id, t1.pid, t1.filename, t1.md5, t1.sha1, t1.sha256, 
+                sql = """select t1.pid, t1.id, t1.filename, t1.md5, t1.sha1, t1.sha256, 
 t1.filesize, t1.filetype, DATE_FORMAT(t1.add_time, '%Y-%m-%d %H:%i:%s') as add_time
 from t_hashdata t1, t_hashdata t2
 where t1.pid=t2.id
-order by pid, id, filename"""
+order by pid, filename"""
                 cursor.execute(sql)
                 data = cursor.fetchall()
                 s_json = json.dumps(data,indent=4, )
                 self.send_response(200)
-                self.send_header('Content-type', 'text/html')#   'text/html')
+                self.send_header('Content-type', 'text/json')#   'text/html')
                 self.end_headers()
                 self.wfile.write(s_json)
-                f.close()
                 return
+            self.path = 'index.html' if self.path=='/' else self.path[1:]
 
+            if self.path.endswith(".js"):
+                s = 'application/x-javascript'
+            
+            if self.path.endswith(".css"):
+                s = 'text/css'
+
+            if self.path.endswith(".js"):
+                s = 'text/html'
+
+            if self.path.endswith(".png"):
+                s = 'image/png'
+
+            if self.path.endswith(".gif"):
+                s = 'image/gif'
+
+            if self.path.endswith(".html"):
+                s = 'text/html'
+            
+            path = os.path.join(os.curdir, self.path)
+            
+            print path
+#             if not os.path.exists(path):
+#                 raise()
+            f = open(path)
+            self.send_response(200)
+            self.send_header('Content-type', s)
+            self.end_headers()
+            self.wfile.write(f.read())
+            f.close()
             return
                 
         except IOError:

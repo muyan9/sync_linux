@@ -229,7 +229,7 @@ if __name__ == "__main__":
     path = "/root/test/unpack/rpm"
     l = do_work(path, [], pkgname_parent='centos', flag_delete=False)
 #     print l
-    insert_data(l, 2)
+    insert_data(l, 3)
     
 #     for i in l :
 #         print i
