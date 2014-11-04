@@ -3,10 +3,10 @@
 import MySQLdb
 conn = MySQLdb.Connect(host = "10.255.193.222", port=3306, user="sync", passwd="linux", db="sync_linux")
 cursor = conn.cursor(MySQLdb.cursors.DictCursor)
-sql = """select t1.pid, t1.id, t1.filename
+sql = """select t1.pid, t1.id, t1.filename as name
 from t_hashdata t1, t_hashdata t2
 where t1.pid=t2.id
-order by pid, filename"""
+order by pid, name"""
 cursor.execute(sql)
 data = cursor.fetchall()
 # print data
@@ -21,11 +21,13 @@ def find_parent(list_tree, pid):
             if node['id']==pid:
                 return node
             if node.has_key('children'):
-                return find_parent(node['children'], pid)
+                ret = find_parent(node['children'], pid)
+                if ret:
+                    return ret
         else:
             print 'no this,', pid
 
-def add_node(node):
+def add_node(list_tree, node):
     parent = find_parent(list_tree, node['pid'])
     if parent:
         if parent.has_key('children'):
@@ -33,14 +35,18 @@ def add_node(node):
         else:
             parent['children'] = [node]
     else:
+        print node
         list_tree.append(node)
 
 for node in data:
     if node['pid']==29:
         pass
-    add_node(node)
+    add_node(list_tree, node)
     
-print list_tree
+# print list_tree
+import json
+s_json = json.dumps(list_tree,indent=2, )
+print s_json
 
 
 # zNodes = { 'name':"父节点1 - 展开", 'open':True,
