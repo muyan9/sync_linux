@@ -9,14 +9,19 @@
 	<script type="text/javascript" src="js/jquery.ztree.core-3.5.js"></script>
 	
 	<SCRIPT type="text/javascript">
-		var setting = {	};
+		function onResize(){
+			$('#treeDemo').width(window.innerWidth-20);
+			$('#treeDemo').height(window.innerHeight-30);
+		}
+		
 		$(document).ready(function(){
 			$.get('data',  function(data){
-				$.fn.zTree.init($("#treeDemo"), setting, data);
-				$('#treeDemo').width(1300);
+				$.fn.zTree.init($("#treeDemo"), {}, data);
+				onResize();
 			}, 'json');
-			
 		});
+		window.onresize=onResize;
+		
 	</SCRIPT>
 </head>
 <body>
