@@ -34,7 +34,6 @@ def add_node(list_tree, node):
             parent['children'] = [node]
             parent['isParent'] = True
     else:
-        print node
         list_tree.append(node)
 
 class MyHandler(BaseHTTPRequestHandler):
@@ -46,9 +45,9 @@ class MyHandler(BaseHTTPRequestHandler):
             if self.path=='data':
                 sql = """select t1.pid, t1.id, t1.filename as name, t1.md5, t1.sha1, t1.sha256, 
 t1.filesize, t1.filetype, DATE_FORMAT(t1.add_time, '%Y-%m-%d %H:%i:%s') as add_time
-from t_hashdata t1, t_hashdata t2
-where t1.pid=t2.id
-order by pid, name"""
+from t_hashdata t1""" #, t_hashdata t2
+#where t1.pid=t2.id
+#""" #order by pid, name
                 cursor.execute(sql)
                 data = cursor.fetchall()
                 list_tree = []
@@ -83,11 +82,7 @@ order by pid, name"""
             
             path = os.path.join(os.curdir, self.path)
             
-            print path
-#             if not os.path.exists(path):
-#                 raise()
             f = open(path, 'rb')
-            print os.stat(path).st_size
             self.send_response(200)
             self.send_header('Content-type', s)
             self.end_headers()

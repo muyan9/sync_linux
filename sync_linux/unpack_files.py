@@ -206,12 +206,12 @@ def insert_data(node, node_parent_id, did):
     if node_type==type(()):
         sql = "insert into t_hashdata\
         (pid, filename, distribution_id, md5, sha1, sha256, filesize, filetype) \
-        values(%(pid)s, '%(filename)s', %(distribution_id)s, '%(md5)s', \
-        '%(sha1)s', '%(sha256)s', %(filesize)s, '%(filetype)s')" \
-        % {'pid':node_parent_id, 'filename':node[0], 'md5':node[2], 'sha1':node[3], 
+        values(%(pid)s, %(filename)s, %(distribution_id)s, %(md5)s, \
+        %(sha1)s, %(sha256)s, %(filesize)s, %(filetype)s)"
+        para_data = {'pid':node_parent_id, 'filename':node[0], 'md5':node[2], 'sha1':node[3], 
            'sha256':node[4], 'filesize':node[5], 'filetype':node[6], 'distribution_id':did}
         logger_insert_data.debug(sql)
-        cursor.execute(sql)
+        cursor.execute(sql, para_data)
         return conn.insert_id()
     elif node_type==type({}):
         key = node.keys()[0]
@@ -234,7 +234,7 @@ cursor = conn.cursor()
 dir_temp = config.cf.get('package_options', 'temp_dir')
 path = config.cf.get('package_options', 'storefiles_dir')
 
-loggingconfig.config_logging(os.path.splitext(os.path.basename(__file__))[0])
+loggingconfig.config_logging("%s.log" % os.path.splitext(os.path.basename(__file__))[0])
 if __name__ == "__main__":
     logger = logging.getLogger("main")
     #TODO: 允许扩展解压种类

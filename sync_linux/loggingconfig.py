@@ -28,12 +28,10 @@ def config_logging( file_name='', log_level='', logs_dir='' ):
         os.makedirs(logs_dir)
 
     file_name = file_name if file_name else config.cf.get('logging', 'log_name')
-    print file_name
     logs_dir = logs_dir if logs_dir else config.cf.get('logging', 'log_dir')
-    print logs_dir
     file_name = os.path.join(logs_dir, file_name)
     # define a rotating file handler
-    rotatingFileHandler = logging.handlers.RotatingFileHandler( filename =file_name,
+    rotatingFileHandler = logging.handlers.RotatingFileHandler( filename = file_name,
                                                       maxBytes = 1024 * 1024 * 100,
                                                       backupCount = config.cf.getint("logging", "num_bak_files") )
     formatter = logging.Formatter("%(asctime)s %(name)-12s %(lineno)3d %(levelname)-8s %(message)s")
@@ -54,6 +52,5 @@ def config_logging( file_name='', log_level='', logs_dir='' ):
     logger = logging.getLogger("")
     
     s = log_level if log_level else config.cf.get('logging', 'level')
-    print s
     level = LEVELS[s.upper()]
     logger.setLevel(level)
