@@ -1,9 +1,14 @@
 #coding: utf8
-import os, cgi, json
+import os, json, MySQLdb
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
-import MySQLdb
-conn = MySQLdb.Connect(host = "10.255.193.222", port=3306, user="sync", passwd="linux", db="sync_linux")
+import config
+
+conn = MySQLdb.Connect(host = config.cf.get('database', 'ip'), 
+                       port = config.cf.getint('database', 'port'), 
+                       user = config.cf.get('database', 'user'), 
+                       passwd = config.cf.get('database', 'pass'), 
+                       db = config.cf.get('database', 'dbname'))
 cursor = conn.cursor(MySQLdb.cursors.DictCursor)
 
 def find_parent(list_tree, pid):
@@ -94,26 +99,9 @@ order by pid, name"""
             self.send_error(404,'File Not Found: %s' % self.path)
      
 
-    def do_POST(self):
-        global rootnode
-        try:
-            ctype, pdict = cgi.parse_header(self.headers.getheader('content-type'))
-            if ctype == 'multipart/form-data':
-                query=cgi.parse_multipart(self.rfile, pdict)
-            self.send_response(301)
-            
-            self.end_headers()
-            upfilecontent = query.get('upfile')
-            print "filecontent", upfilecontent[0]
-            self.wfile.write("<HTML>POST OK.<BR><BR>");
-            self.wfile.write(upfilecontent[0]);
-            
-        except :
-            pass
-
 def main():
     try:
-        server = HTTPServer(('', 80), MyHandler)
+        server = HTTPServer(('', config.cf.getint('web_server', 'port')), MyHandler)
         print 'started httpserver...'
         server.serve_forever()
     except KeyboardInterrupt:

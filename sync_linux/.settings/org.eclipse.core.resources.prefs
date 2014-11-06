@@ -1,11 +1,11 @@
 eclipse.preferences.version=1
+encoding/config.py=utf8
 encoding/db.py=utf8
 encoding/down_ftp.py=utf8
 encoding/down_http.py=utf8
 encoding/hash.py=utf8
 encoding/loggingconfig.py=utf-8
 encoding/main.py=utf8
-encoding/test_gz.py=utf8
 encoding/test_json.py=utf8
 encoding/test_para.py=utf8
 encoding/unpack_files.py=utf8

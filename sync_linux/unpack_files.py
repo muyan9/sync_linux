@@ -1,6 +1,6 @@
 #coding: utf8
-import os, shutil, inspect, logging
-import hash, loggingconfig
+import os, shutil, inspect, logging, pickle, MySQLdb
+import hash, loggingconfig, config
 
 dict_type_package = {'iso':'iso', 
                      'gz':'7z', 
@@ -8,7 +8,7 @@ dict_type_package = {'iso':'iso',
                      'bzip2':'7z', 
                      'tar':'7z', 
                      'gzip':'7z', 
-                     'cpio':'', 
+                     'cpio':'cpio', 
                      'zip':'7z', 
                      'cab':'7z', 
                      'arj':'7z', 
@@ -16,25 +16,13 @@ dict_type_package = {'iso':'iso',
                      'rpm':'rpm', 
                      'drpm':'',
                      'deb':'', 
-                     'xz':'', 
-                     'lzma':'', 
+                     'xz':'7z', 
+                     'txz':'7z',
+                     'lzma':'7z', 
                      'lzip':'', 
                      'lzop':''}
 
 
-"""
-  -j, --bzip2                filter the archive through bzip2
-  -J, --xz                   filter the archive through xz
-      --lzip                 filter the archive through lzip
-      --lzma                 filter the archive through lzma
-      --lzop
-      --no-auto-compress     do not use archive suffix to determine the
-                             compression program
-  -z, --gzip, --gunzip, --ungzip   filter the archive through gzip
-  -Z, --compress, --uncompress   filter the archive through compress
-"""
-#--recursion
-#-C, --directory=DIR
 class unpack():
     def unpack_7z(self, filename):
         logger_unpack_7z = logging.getLogger("unpack_7z")
@@ -50,7 +38,7 @@ class unpack():
 #             cmd = 'mount -oloop,ro %(dir_src)s %(dir_dst)s' % {'dir_src':filename, 'dir_dst':dir_tmp}
 #         else:
 #             cmd = '7za x -y -o%(dir_dst)s %(dir_src)s > /dev/null' % {'dir_src':filename, 'dir_dst':dir_tmp}
-        cmd = '7za x -y -o"%(dir_dst)s" "%(dir_src)s" > /dev/null' % {'dir_src':filename, 'dir_dst':dir_tmp}
+        cmd = '7za x -y -o"%(dir_dst)s" "%(dir_src)s" 1>/dev/null 2>/dev/null' % {'dir_src':filename, 'dir_dst':dir_tmp}
         logger_unpack_7z.debug(cmd)
         os.popen(cmd)
         
@@ -66,10 +54,25 @@ class unpack():
         
         dir_tmp = mktemp()
         logger_unpack_rpm.debug(dir_tmp)
-        cmd = 'cd %(dir_dst)s && rpm2cpio "%(dir_src)s" | cpio -di > /dev/null' % {'dir_src':filename, 'dir_dst':dir_tmp}
+        cmd = 'cd %(dir_dst)s && rpm2cpio "%(dir_src)s" | cpio -di 1>/dev/null 2>/dev/null' % {'dir_src':filename, 'dir_dst':dir_tmp}
         logger_unpack_rpm.debug(cmd)
         os.popen(cmd)
         logger_unpack_rpm.info("%s -> %s" % (filename, dir_tmp))
+        
+        return dir_tmp
+
+    def unpack_cpio(self, filename):
+        logger_unpack_cpio = logging.getLogger("unpack_rpm")
+        if not os.path.exists(filename):
+            logger_unpack_cpio.error("file '%s' not found!" % filename)
+            raise IOError("file '%s' not found!" % filename)
+        
+        dir_tmp = mktemp()
+        logger_unpack_cpio.debug(dir_tmp)
+        cmd = 'cd %(dir_dst)s && cpio -di < %(dir_src)s 1>/dev/null 2>/dev/null' % {'dir_src':filename, 'dir_dst':dir_tmp}
+        logger_unpack_cpio.debug(cmd)
+        os.popen(cmd)
+        logger_unpack_cpio.info("%s -> %s" % (filename, dir_tmp))
         
         return dir_tmp
 
@@ -121,28 +124,33 @@ def is_pack(filename):
     if len(l_filename)==2:
         #splitextf分解/root/a.tar.gz的结果是tuple: ('/root/a.tar', '.gz')
         #所以要把扩展名的第一个字符’.’去掉
-        extname = l_filename[1][1:]
+        extname = l_filename[1][1:].lower()
         if extname in dict_type_package.keys():
             return dict_type_package[extname]
     
     return None
 
 def mktemp():
-    cmd = '/bin/mktemp -d -p /root/test/unpack/tmp'
+    cmd = '/bin/mktemp -d -p %s' % dir_temp
     return os.popen(cmd).read().strip()
     
-def removefiles(file):
-    if os.path.isdir(file):
-#         os.removedirs(file)
-        shutil.rmtree(file)
+def removefiles(filename):
+    if os.path.isdir(filename):
+        shutil.rmtree(filename)
     else:
-        os.remove(file)
+        try:
+            os.remove(filename)
+        except OSError, e:
+            logger.error(e)
 
 def walk_dir(filename):
     list_files = []
-    for root,dirs,files in os.walk(filename):
-        for file in files:
-            list_files.append(os.path.join(root, file))
+    if os.path.isfile(filename):
+        list_files.append(filename)
+    else:
+        for root,dirs,files in os.walk(filename):
+            for file in files:
+                list_files.append(os.path.join(root, file))
             
     return list_files
 
@@ -152,26 +160,30 @@ o_unpack = unpack()
 def do_work(filename, list_data, pkgname_parent="", flag_delete=False):
     logger_do_work = logging.getLogger("do_work")
     l = []
-    
-    for file in walk_dir(filename):
-        #FIXME: 判断解压临时存储位置是否能放得下，用一次读取n次计算的方式解决
-        if os.path.islink(file):
-            os.unlink(file)
-            logger_do_work.debug('unlink %s' % file)
-            continue
-        d_md5 = hash.md5_file(file)
-        d_sha1 = hash.sha1_file(file)
-        d_sha256 = hash.sha256_file(file)
-        filesize = os.stat(file).st_size
         
-        cmd= 'file "%s" | cut -c %s-' % (file, len(file)+3)
+    for sub_filename in walk_dir(filename):
+        
+        if os.path.islink(sub_filename):
+            os.unlink(sub_filename)
+            logger_do_work.debug('unlink %s' % sub_filename)
+            continue
+        #FIXME: 判断解压临时存储位置是否能放得下
+        file_bindata = open(sub_filename, 'rb').read()
+        d_md5 = hash.md5(file_bindata)
+        d_sha1 = hash.sha1(file_bindata)
+        d_sha256 = hash.sha256(file_bindata)
+        filesize = os.stat(sub_filename).st_size
+        
+        cmd= 'file "%s" | cut -c %s-' % (sub_filename, len(sub_filename)+3)
         logger_do_work.debug(cmd)
         filetype =os.popen(cmd).read().strip() 
-
-        t_filename = file.partition(filename)[2]
+        if os.path.isfile(filename):
+            t_filename = sub_filename[sub_filename.index(pkgname_parent)+len(pkgname_parent):]
+        else:
+            t_filename = sub_filename.partition(filename)[2]
         
-        if is_pack(file):
-            dir_temp = o_unpack.unpack(file)
+        if is_pack(sub_filename):
+            dir_temp = o_unpack.unpack(sub_filename)
             pkg_info = (t_filename, pkgname_parent, d_md5, d_sha1, d_sha256, filesize, filetype)
             logger_do_work.debug("recursive do_work start: %s", t_filename)
             ll = do_work(dir_temp,list_data, t_filename, flag_delete=True)
@@ -182,56 +194,83 @@ def do_work(filename, list_data, pkgname_parent="", flag_delete=False):
         else:
             l.append((t_filename, pkgname_parent, d_md5, d_sha1, d_sha256, filesize, filetype))
             if flag_delete:
-                removefiles(file)
+                removefiles(sub_filename)
     else:
         if flag_delete:
             removefiles(filename)
     return l
 
-def insert_data(node, node_parent_id):
+def insert_data(node, node_parent_id, did):
     logger_insert_data = logging.getLogger("insert_data")
     node_type = type(node)
     if node_type==type(()):
-        sql = "insert into t_hashdata1\
-        (pid, filename, md5, sha1, sha256, filesize, filetype) \
-        values(%(pid)s, '%(filename)s', '%(md5)s', \
+        sql = "insert into t_hashdata\
+        (pid, filename, distribution_id, md5, sha1, sha256, filesize, filetype) \
+        values(%(pid)s, '%(filename)s', %(distribution_id)s, '%(md5)s', \
         '%(sha1)s', '%(sha256)s', %(filesize)s, '%(filetype)s')" \
         % {'pid':node_parent_id, 'filename':node[0], 'md5':node[2], 'sha1':node[3], 
-           'sha256':node[4], 'filesize':node[5], 'filetype':node[6]}
+           'sha256':node[4], 'filesize':node[5], 'filetype':node[6], 'distribution_id':did}
         logger_insert_data.debug(sql)
         cursor.execute(sql)
         return conn.insert_id()
     elif node_type==type({}):
         key = node.keys()[0]
         value = node[key]
-        id = insert_data(key, node_parent_id)
-        insert_data(value, id)
+        id = insert_data(key, node_parent_id, did)
+        insert_data(value, id, did)
     elif node_type==type([]):
         for i in node:
-            insert_data(i, node_parent_id)
+            insert_data(i, node_parent_id, did)
     else:
         pass
     
-import MySQLdb
-conn = MySQLdb.Connect(host = "10.255.193.222", port=3306, user="sync", passwd="linux", db="sync_linux")
+conn = MySQLdb.Connect(host = config.cf.get('database', 'ip'), 
+                       port = config.cf.getint('database', 'port'), 
+                       user = config.cf.get('database', 'user'), 
+                       passwd = config.cf.get('database', 'pass'), 
+                       db = config.cf.get('database', 'dbname'))
 cursor = conn.cursor()
 
+dir_temp = config.cf.get('package_options', 'temp_dir')
+path = config.cf.get('package_options', 'storefiles_dir')
 
+loggingconfig.config_logging(os.path.splitext(os.path.basename(__file__))[0])
 if __name__ == "__main__":
-    loggingconfig.config_logging("unpack_and_hash.log", 'debug', 'logs')
     logger = logging.getLogger("main")
     #TODO: 允许扩展解压种类
     #delete tmp files and do not remove any origin files
     #TODO: first run, hash all files
-    path = "/root/test/unpack/rpm"
-    l = do_work(path, [], pkgname_parent='centos', flag_delete=False)
-    import pickle
-    pickle.dump(l, open("a.bak", 'wb'))
-    insert_data(l, 3)
     
-#     for i in l :
-#         print i
+    for dir_distribution in os.listdir(path):
+        if not os.path.isdir(os.path.join(path, dir_distribution)):
+            continue
+        
+        print '-----' , dir_distribution
+        sql = "select id from distribution where name='%s'" % dir_distribution
+        cursor.execute(sql)
+        data = cursor.fetchone()
+        if data:
+            did = data[0]
+        else:
+            sql = "insert into distribution(name) values('%s')" % dir_distribution
+            cursor.execute(sql)
+            did = conn.insert_id()
+            sql = "insert into t_hashdata(pid, filename, distribution_id) values (2, '%s', %s)" % (dir_distribution, did)
+            cursor.execute(sql)
+        logger.info("did : %s" % did)
+        for filename in walk_dir(os.path.join(path, dir_distribution)):
+            s = filename.partition(os.path.join(path, dir_distribution))[2]
+            logger.info(s)
+            
+            l = do_work(filename, [], pkgname_parent=dir_distribution, flag_delete=False)
+#         pickle.dump(l, open("a.bak", 'wb'))
+            sql = "select id from t_hashdata where filename='%s'" % dir_distribution
+            cursor.execute(sql)
+            data = cursor.fetchone()
+            if data:
+                hid = data[0]
+            insert_data(l, hid, did)
+    
     #TODO: not first run, read increment list
     
     #TODO: 有些文件是更新的，如何处理
-    #TODO: 加入时间字段，区别历史版本
