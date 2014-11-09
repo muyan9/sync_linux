@@ -7,5 +7,4 @@ encoding/hash.py=utf8
 encoding/loggingconfig.py=utf-8
 encoding/main.py=utf8
 encoding/test_json.py=utf8
-encoding/test_para.py=utf8
 encoding/unpack_files.py=utf8
