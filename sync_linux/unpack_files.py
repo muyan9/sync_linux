@@ -2,6 +2,11 @@
 import os, shutil, inspect, logging, pickle, MySQLdb
 import hash, loggingconfig, config
 
+#TODO: 该文件仅提供了发行版首次入库的处理方法，若有增量文件需额外处理
+
+
+#预置压缩包对应的解压处理函数，对应下面的多个unpack_%s方法
+#值为''的类型是目前还不支持的
 dict_type_package = {'iso':'iso', 
                      'gz':'7z', 
                      'bz2':'7z',
@@ -24,6 +29,7 @@ dict_type_package = {'iso':'iso',
 
 
 class unpack():
+    #解压缩7z扩展名的文件
     def unpack_7z(self, filename):
         logger_unpack_7z = logging.getLogger("unpack_7z")
         if not os.path.exists(filename):
@@ -46,6 +52,7 @@ class unpack():
         
         return dir_tmp
 
+    #解压缩rpm格式
     def unpack_rpm(self, filename):
         logger_unpack_rpm = logging.getLogger("unpack_rpm")
         if not os.path.exists(filename):
@@ -61,6 +68,7 @@ class unpack():
         
         return dir_tmp
 
+    #解压缩cpio格式
     def unpack_cpio(self, filename):
         logger_unpack_cpio = logging.getLogger("unpack_rpm")
         if not os.path.exists(filename):
@@ -76,6 +84,8 @@ class unpack():
         
         return dir_tmp
 
+    #解压缩iso格式
+    #iso可以直接挂载，所以使用mount方式，不是真正的解压缩
     def unpack_iso(self, filename):
         logger_unpack_iso = logging.getLogger("unpack_iso")
         if not os.path.exists(filename):
@@ -101,7 +111,7 @@ class unpack():
         logger_unpack_iso.info("%s -> %s" % (filename, dir_tmp))
         return dir_tmp1
     
-    #, flag_recursive=True
+    #解压缩总入口，匹配dict_type_package中对应的解压方法调用对应的函数
     def unpack(self, filename):
         logger_unpack = logging.getLogger("unpack")
         ispack = is_pack(filename)
@@ -116,6 +126,7 @@ class unpack():
         
         return None
 
+#判断是否已被支持的压缩格式
 def is_pack(filename):
     if not os.path.exists(filename):
         raise IOError("file '%s' not found!" % filename)
@@ -130,10 +141,12 @@ def is_pack(filename):
     
     return None
 
+#常见解压缩临时文件夹
 def mktemp():
     cmd = '/bin/mktemp -d -p %s' % dir_temp
     return os.popen(cmd).read().strip()
-    
+
+#递归删除文件夹和文件
 def removefiles(filename):
     if os.path.isdir(filename):
         shutil.rmtree(filename)
@@ -143,6 +156,7 @@ def removefiles(filename):
         except OSError, e:
             logger.error(e)
 
+#返回目录树
 def walk_dir(filename):
     list_files = []
     if os.path.isfile(filename):
@@ -157,6 +171,7 @@ def walk_dir(filename):
 
 o_unpack = unpack()
 
+#解压缩递归处理主流程
 def do_work(filename, list_data, pkgname_parent="", flag_delete=False):
     logger_do_work = logging.getLogger("do_work")
     l = []
@@ -168,6 +183,7 @@ def do_work(filename, list_data, pkgname_parent="", flag_delete=False):
             logger_do_work.debug('unlink %s' % sub_filename)
             continue
         #FIXME: 判断解压临时存储位置是否能放得下
+        #TODO: 考虑分片读取数据降低内存压力
         file_bindata = open(sub_filename, 'rb').read()
         d_md5 = hash.md5(file_bindata)
         d_sha1 = hash.sha1(file_bindata)
@@ -200,6 +216,7 @@ def do_work(filename, list_data, pkgname_parent="", flag_delete=False):
             removefiles(filename)
     return l
 
+#数据入库递归处理
 def insert_data(node, node_parent_id, did):
     logger_insert_data = logging.getLogger("insert_data")
     node_type = type(node)
@@ -223,7 +240,8 @@ def insert_data(node, node_parent_id, did):
             insert_data(i, node_parent_id, did)
     else:
         pass
-    
+
+#数据库连接
 conn = MySQLdb.Connect(host = config.cf.get('database', 'ip'), 
                        port = config.cf.getint('database', 'port'), 
                        user = config.cf.get('database', 'user'), 
@@ -234,43 +252,50 @@ cursor = conn.cursor()
 dir_temp = config.cf.get('package_options', 'temp_dir')
 path = config.cf.get('package_options', 'storefiles_dir')
 
+#日志配置
 loggingconfig.config_logging("%s.log" % os.path.splitext(os.path.basename(__file__))[0])
+
+#程序入口点
 if __name__ == "__main__":
     logger = logging.getLogger("main")
     #TODO: 允许扩展解压种类
     #delete tmp files and do not remove any origin files
     #TODO: first run, hash all files
     
-    for dir_distribution in os.listdir(path):
+    for dir_distribution in os.listdir(path):#各linux发行版文件存放在
         if not os.path.isdir(os.path.join(path, dir_distribution)):
             continue
         
-        print '-----' , dir_distribution
+        logger.info(dir_distribution)
+        
+        #确定发行版索引表中对应的id编号
         sql = "select id from distribution where name='%s'" % dir_distribution
         cursor.execute(sql)
         data = cursor.fetchone()
         if data:
+            #若已在库中存在，则取出备用
             did = data[0]
         else:
+            #若库中不存在，生成id号并插入库中
             sql = "insert into distribution(name) values('%s')" % dir_distribution
             cursor.execute(sql)
             did = conn.insert_id()
             sql = "insert into t_hashdata(pid, filename, distribution_id) values (2, '%s', %s)" % (dir_distribution, did)
             cursor.execute(sql)
         logger.info("did : %s" % did)
+        
         for filename in walk_dir(os.path.join(path, dir_distribution)):
             s = filename.partition(os.path.join(path, dir_distribution))[2]
             logger.info(s)
             
+            #开始递归解压缩，并返回全部文件的结果集
             l = do_work(filename, [], pkgname_parent=dir_distribution, flag_delete=False)
-#         pickle.dump(l, open("a.bak", 'wb'))
+            #查询发行版数据表中对应的id
             sql = "select id from t_hashdata where filename='%s'" % dir_distribution
             cursor.execute(sql)
             data = cursor.fetchone()
             if data:
                 hid = data[0]
+            
+            #将文件hash结果集插入数据库中
             insert_data(l, hid, did)
-    
-    #TODO: not first run, read increment list
-    
-    #TODO: 有些文件是更新的，如何处理
